@@ -1,13 +1,16 @@
-"""EWS shipping tracker -> Discord. Runs on GitHub Actions cron. Stdlib only."""
+"""Package trackers -> Discord. Runs on GitHub Actions cron. Stdlib only."""
 import os, json, urllib.request, urllib.error
 
-KEY  = os.environ["TRACKINGMORE_API_KEY"]
-HOOK = os.environ["DISCORD_WEBHOOK_URL"]
-NUM  = os.environ["TRACKING_NUMBER"]
-API  = "https://api.trackingmore.com/v4/trackings"
+KEY      = os.environ["TRACKINGMORE_API_KEY"]
+HOOK     = os.environ["DISCORD_WEBHOOK_URL"]
+EWS_NUM  = os.environ["TRACKING_NUMBER"]
+GOFO_NUM = os.environ.get("GOFO_TRACKING_NUMBER", "").strip()
+API      = "https://api.trackingmore.com/v4/trackings"
+GOFO_API = "https://www.gofo.com/us/cnee-api/consignee/track/query"
 # Discord is behind Cloudflare, which 403s (error 1010) the default Python-urllib UA.
-UA   = "ews-tracker/1.0 (+https://github.com)"
-H    = {"Content-Type": "application/json", "Tracking-Api-Key": KEY, "User-Agent": UA}
+UA       = "package-tracker/1.0 (+https://github.com)"
+H        = {"Content-Type": "application/json", "Tracking-Api-Key": KEY, "User-Agent": UA}
+GOFO_H   = {"Content-Type": "application/json", "Accept": "application/json", "lang": "en", "User-Time-Zone": "America/New_York", "User-Agent": UA}
 
 
 def call(method, url, body=None, headers=H):
@@ -30,36 +33,85 @@ def _parse(status, raw):
     return out
 
 
-# 1. idempotent register (no-op if already tracked)
-call("POST", f"{API}/create", {"tracking_number": NUM, "courier_code": "8dt"})
+def trackingmore_package():
+    # idempotent register (no-op if already tracked)
+    call("POST", f"{API}/create", {"tracking_number": EWS_NUM, "courier_code": "8dt"})
 
-# 2. fetch latest status
-res = call("GET", f"{API}/get?tracking_numbers={NUM}")
-item = (res.get("data") or [{}])[0]
-status = item.get("delivery_status", "unknown")
-track = (item.get("origin_info") or {}).get("trackinfo") or []
-latest = track[0] if track else {}
-line = latest.get("tracking_detail", "No checkpoints yet")
-when = latest.get("checkpoint_date", "")
-where = latest.get("location", "")
+    res = call("GET", f"{API}/get?tracking_numbers={EWS_NUM}")
+    item = (res.get("data") or [{}])[0]
+    status = item.get("delivery_status", "unknown")
+    track = (item.get("origin_info") or {}).get("trackinfo") or []
+    latest = track[0] if track else {}
+    return {
+        "key": "ews",
+        "label": f"EWS {EWS_NUM}",
+        "status": status,
+        "line": latest.get("tracking_detail", "No checkpoints yet"),
+        "when": latest.get("checkpoint_date", ""),
+        "where": latest.get("location", ""),
+    }
 
-# 3. did the latest checkpoint change since last run?
-try:
-    prev = json.load(open("last_status.json")).get("line")
-except Exception:
-    prev = None
-changed = (line != prev)
 
-# 4. build + send Discord message
-emoji = "🟢" if status == "delivered" else "🟡"
-banner = "**🔔 UPDATE since last check**\n" if changed and prev else ""
-msg = f"{banner}{emoji} **EWS {NUM}** — `{status}`\n{line}\n📍 {where}  🕒 {when}"
+def gofo_package():
+    res = call("POST", GOFO_API, {"numberList": [GOFO_NUM]}, headers=GOFO_H)
+    item = ((res.get("data") or {}).get("success") or [{}])[0]
+    latest = item.get("lastTrackEvent") or ((item.get("trackEventList") or [{}])[0])
+    where = ", ".join(x for x in [latest.get("processCity"), latest.get("processProvince")] if x)
+    return {
+        "key": "gofo",
+        "label": f"GOFO {GOFO_NUM}",
+        "status": item.get("status", "unknown"),
+        "line": latest.get("processContent", res.get("msg") or "No checkpoints yet"),
+        "when": latest.get("processDate", ""),
+        "where": where or latest.get("processLocation", ""),
+    }
+
+
+def load_previous():
+    try:
+        data = json.load(open("last_status.json"))
+    except Exception:
+        return {}
+    if "packages" in data:
+        return data["packages"]
+    if "line" in data:
+        return {"ews": {"line": data.get("line")}}
+    return data
+
+
+def status_emoji(status):
+    return "🟢" if str(status).lower() == "delivered" else "🟡"
+
+
+def format_package(pkg, previous):
+    prev_line = (previous.get(pkg["key"]) or {}).get("line")
+    changed = pkg["line"] != prev_line
+    banner = "**🔔 UPDATE since last check**\n" if changed and prev_line else ""
+    return f"{banner}{status_emoji(pkg['status'])} **{pkg['label']}** — `{pkg['status']}`\n{pkg['line']}\n📍 {pkg['where']}  🕒 {pkg['when']}"
+
+
+previous = load_previous()
+packages = [trackingmore_package()]
+if GOFO_NUM:
+    packages.append(gofo_package())
+
+msg = "\n\n".join(format_package(pkg, previous) for pkg in packages)
 dres = call("POST", HOOK, {"content": msg}, headers={"Content-Type": "application/json", "User-Agent": UA})
 
 # Discord webhook returns 204 No Content on success. Anything else = a real error.
 if dres.get("_status") != 204:
     raise SystemExit(f"Discord webhook failed: HTTP {dres.get('_status')} {dres}")
 
-# 5. persist (only reached on a successful send)
-json.dump({"line": line}, open("last_status.json", "w"))
+# persist (only reached on a successful send)
+state = {
+    "packages": {
+        pkg["key"]: {
+            "line": pkg["line"],
+            "status": pkg["status"],
+            "when": pkg["when"],
+        }
+        for pkg in packages
+    }
+}
+json.dump(state, open("last_status.json", "w"), indent=2, sort_keys=True)
 print("sent:", msg)

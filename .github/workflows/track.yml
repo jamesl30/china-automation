@@ -1,4 +1,4 @@
-name: ews-tracker
+name: package-tracker
 on:
   schedule:
     # 6am-10pm Pacific (PDT, UTC-7) every 2h -> 13,15,17,19,21,23,01,03,05 UTC. :17 avoids top-of-hour congestion.
@@ -9,7 +9,7 @@ permissions:
 jobs:
   track:
     runs-on: ubuntu-latest
-    concurrency: ews-tracker     # never overlap runs
+    concurrency: package-tracker # never overlap runs
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,6 +20,7 @@ jobs:
           TRACKINGMORE_API_KEY: ${{ secrets.TRACKINGMORE_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TRACKING_NUMBER: ${{ vars.TRACKING_NUMBER }}
+          GOFO_TRACKING_NUMBER: ${{ vars.GOFO_TRACKING_NUMBER }}
         run: python track.py
       - name: Persist last status
         run: |
