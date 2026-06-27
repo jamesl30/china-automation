@@ -1,14 +1,14 @@
 {
   "packages": {
     "ews": {
-      "line": "Sending To The Post Office",
+      "line": "Arrived at GOFO Regional Hub",
       "status": "transit",
-      "when": "2026-06-25T14:56:00"
+      "when": "2026-06-26T15:36:00"
     },
     "gofo": {
-      "line": "Arrived at GOFO Regional Hub",
-      "status": "Transit",
-      "when": "2026-06-26T18:36:21.000-0700"
+      "line": "Departed GOFO Regional Hub",
+      "status": "Processing",
+      "when": "2026-06-26T23:12:48.000-0700"
     }
   }
 }
