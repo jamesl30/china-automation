@@ -1,13 +1,13 @@
 {
   "packages": {
     "ews": {
-      "line": "Departed GOFO Regional Hub",
+      "line": "Arrived at GOFO Regional Hub",
       "status": "transit",
-      "when": "2026-06-26T20:12:00"
+      "when": "2026-06-27T07:36:00"
     },
     "gofo": {
       "line": "Arrived at GOFO Regional Hub",
-      "status": "Processing",
+      "status": "Transit",
       "when": "2026-06-27T10:36:34.000-0700"
     }
   }
