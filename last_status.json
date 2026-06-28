@@ -1,9 +1,9 @@
 {
   "packages": {
     "ews": {
-      "line": "Arrived at GOFO Delivery Station",
-      "status": "transit",
-      "when": "2026-06-28T02:11:00"
+      "line": "Delivered, Mail Room. For Delivery Issues & Tracking Support, Contact GOFO at +1 949 688-6032 or cs@mail.gofo.com",
+      "status": "delivered",
+      "when": "2026-06-28T10:10:00"
     },
     "gofo": {
       "line": "Delivered, Mail Room. For Delivery Issues & Tracking Support, Contact GOFO at +1 949 688-6032 or cs@mail.gofo.com",
