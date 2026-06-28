@@ -1,9 +1,9 @@
 {
   "packages": {
     "ews": {
-      "line": "Arrived at GOFO Regional Hub",
+      "line": "Arrived at GOFO Delivery Station",
       "status": "transit",
-      "when": "2026-06-27T07:36:00"
+      "when": "2026-06-28T02:11:00"
     },
     "gofo": {
       "line": "Out for Delivery",
